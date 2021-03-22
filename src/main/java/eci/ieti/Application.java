@@ -2,24 +2,37 @@ package eci.ieti;
 
 import eci.ieti.data.CustomerRepository;
 import eci.ieti.data.ProductRepository;
+import eci.ieti.data.TodoRepository;
+import eci.ieti.data.UserRepository;
 import eci.ieti.data.model.Customer;
 import eci.ieti.data.model.Product;
 
+import eci.ieti.data.model.Todo;
+import eci.ieti.data.model.User;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.mongodb.core.MongoOperations;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+
+import java.time.LocalDate;
+import java.util.List;
+
 
 @SpringBootApplication
 public class Application implements CommandLineRunner {
 
 
     @Autowired
-    private CustomerRepository customerRepository;
+    private UserRepository userRepository;
 
     @Autowired
-    private ProductRepository productRepository;
+    private TodoRepository todoRepository;
     
     public static void main(String[] args) {
         SpringApplication.run(Application.class, args);
@@ -27,40 +40,57 @@ public class Application implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
+        ApplicationContext applicationContext = new AnnotationConfigApplicationContext(AppConfiguration.class);
+        MongoOperations mongoOperation = (MongoOperations) applicationContext.getBean("mongoTemplate");
 
-        customerRepository.deleteAll();
+        userRepository.deleteAll();
 
-        customerRepository.save(new Customer("Alice", "Smith"));
-        customerRepository.save(new Customer("Bob", "Marley"));
-        customerRepository.save(new Customer("Jimmy", "Page"));
-        customerRepository.save(new Customer("Freddy", "Mercury"));
-        customerRepository.save(new Customer("Michael", "Jackson"));
+        for(int i=0;i<10;i++){
+            userRepository.save(new User("user"+i, "user"+i+"mail.com"));
+        }
 
         System.out.println("Customers found with findAll():");
         System.out.println("-------------------------------");
-        
-        customerRepository.findAll().stream().forEach(System.out::println);
-        System.out.println();
-        
-        productRepository.deleteAll();
 
-        productRepository.save(new Product(1L, "Samsung S8", "All new mobile phone Samsung S8"));
-        productRepository.save(new Product(2L, "Samsung S8 plus", "All new mobile phone Samsung S8 plus"));
-        productRepository.save(new Product(3L, "Samsung S9", "All new mobile phone Samsung S9"));
-        productRepository.save(new Product(4L, "Samsung S9 plus", "All new mobile phone Samsung S9 plus"));
-        productRepository.save(new Product(5L, "Samsung S10", "All new mobile phone Samsung S10"));
-        productRepository.save(new Product(6L, "Samsung S10 plus", "All new mobile phone Samsung S10 plus"));
-        productRepository.save(new Product(7L, "Samsung S20", "All new mobile phone Samsung S20"));
-        productRepository.save(new Product(8L, "Samsung S20 plus", "All new mobile phone Samsung S20 plus"));
-        productRepository.save(new Product(9L, "Samsung S20 ultra", "All new mobile phone Samsung S20 ultra"));
-        
-        System.out.println("Paginated search of products by criteria:");
-        System.out.println("-------------------------------");
-        
-        productRepository.findByDescriptionContaining("plus", PageRequest.of(0, 2)).stream()
-        	.forEach(System.out::println);
-   
+        userRepository.findAll().stream().forEach(System.out::println);
         System.out.println();
+
+        todoRepository.deleteAll();
+
+        for(int i=0;i<25;i++){
+            Integer date = (i%21)+10;
+            todoRepository.save(new Todo("hola",i,"2021-03-"+date,"user"+i%10+"@mail.com","hola"));
+        }
+
+        System.out.println();
+
+        LocalDate date = LocalDate.now();
+        Query query = new Query();
+        query.addCriteria(Criteria.where("dueDate").lt(date.toString()));
+
+        List<Todo> todos = mongoOperation.find(query,Todo.class);
+        List<Todo> todosd=todoRepository.findByDueDateBefore(date.toString());
+        System.out.println(todos.size());
+        System.out.println(todosd.size());
+
+        query = new Query();
+        query.addCriteria(Criteria.where("responsible").is("user1@mail.com")
+                .and("priority").gte(5));
+
+        List<Todo> todos1 = mongoOperation.find(query,Todo.class);
+        List<Todo> todosd1=todoRepository.findByResponsibleEqualsAndPriorityIsGreaterThanEqual("user1@mail.com",5);
+        System.out.println(todos1.size());
+        System.out.println(todosd1.size());
+
+        todoRepository.save(new Todo("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",1,"2021-03-22","user1@mail.com","hola"));
+        query = new Query();
+        query.addCriteria(Criteria.where("description").regex("^.{30,}$"));
+        List<Todo> todos2 = mongoOperation.find(query,Todo.class);
+        List<Todo> todosd2 = todoRepository.findByDescriptionMatchesRegex("^.{30,}$");
+        System.out.println(todos2.size());
+        System.out.println(todosd2.size());
+
+
     }
 
 }
